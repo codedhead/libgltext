@@ -1,4 +1,4 @@
-package com.android.texample;
+package ninja.jun.gl.libgltext;
 
 import android.util.FloatMath;
 

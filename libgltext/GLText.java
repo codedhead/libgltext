@@ -7,7 +7,7 @@
 // origin, and the (x,y) positions are relative to that, as well as the
 // bottom-left of the string to render.
 
-package com.android.texample;
+package ninja.jun.gl.libgltext;
 
 import javax.microedition.khronos.opengles.GL10;
 

@@ -1,4 +1,4 @@
-package com.android.texample;
+package ninja.jun.gl.libgltext;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

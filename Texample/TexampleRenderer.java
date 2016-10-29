@@ -3,6 +3,8 @@
 
 package com.android.texample;
 
+import ninja.jun.gl.libgltext.GLText;
+
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
