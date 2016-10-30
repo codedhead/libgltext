@@ -1,11 +1,11 @@
 package ninja.jun.gl.libgltext;
 
+import android.opengl.GLES20;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
-
-import javax.microedition.khronos.opengles.GL10;
 
 public class Vertices {
 
@@ -20,7 +20,6 @@ public class Vertices {
 
    //--Members--//
    // NOTE: all members are constant, and initialized in constructor!
-   final GL10 gl;                                     // GL Instance
    final boolean hasColor;                            // Use Color in Vertices
    final boolean hasTexCoords;                        // Use Texture Coords in Vertices
    final boolean hasNormals;                          // Use Normals in Vertices
@@ -32,10 +31,11 @@ public class Vertices {
    public int numVertices;                            // Number of Vertices in Buffer
    public int numIndices;                             // Number of Indices in Buffer
    final int[] tmpBuffer;                             // Temp Buffer for Vertex Conversion
+   final GLTextProgram program;                       // Shader program
 
    //--Constructor--//
    // D: create the vertices/indices as specified (for 2d/3d)
-   // A: gl - the gl instance to use
+   // A: program - the shader program used for text rendering
    //    maxVertices - maximum vertices allowed in buffer
    //    maxIndices - maximum indices allowed in buffer
    //    hasColor - use color values in vertices
@@ -43,11 +43,11 @@ public class Vertices {
    //    hasNormals - use normals in vertices
    //    use3D - (false, default) use 2d positions (ie. x/y only)
    //            (true) use 3d positions (ie. x/y/z)
-   public Vertices(GL10 gl, int maxVertices, int maxIndices, boolean hasColor, boolean hasTexCoords, boolean hasNormals)  {
-      this( gl, maxVertices, maxIndices, hasColor, hasTexCoords, hasNormals, false );  // Call Overloaded Constructor
+   public Vertices(GLTextProgram program, int maxVertices, int maxIndices)  {
+      this( program, maxVertices, maxIndices, false /* hasColor */, true /* hasTexCoords */, false /* hasNormals */, false /* use3D */);  // Call Overloaded Constructor
    }
-   public Vertices(GL10 gl, int maxVertices, int maxIndices, boolean hasColor, boolean hasTexCoords, boolean hasNormals, boolean use3D)  {
-      this.gl = gl;                                   // Save GL Instance
+   public Vertices(GLTextProgram program, int maxVertices, int maxIndices, boolean hasColor, boolean hasTexCoords, boolean hasNormals, boolean use3D)  {
+      this.program = program;
       this.hasColor = hasColor;                       // Save Color Flag
       this.hasTexCoords = hasTexCoords;               // Save Texture Coords Flag
       this.hasNormals = hasNormals;                   // Save Normals Flag
@@ -111,26 +111,26 @@ public class Vertices {
    // A: [none]
    // R: [none]
    public void bind()  {
-      gl.glEnableClientState( GL10.GL_VERTEX_ARRAY ); // Enable Position in Vertices
+      GLES20.glEnableVertexAttribArray( program.a_Position ); // Enable Position in Vertices
       vertices.position( 0 );                         // Set Vertex Buffer to Position
-      gl.glVertexPointer( positionCnt, GL10.GL_FLOAT, vertexSize, vertices );  // Set Vertex Pointer
+      GLES20.glVertexAttribPointer( program.a_Position, positionCnt, GLES20.GL_FLOAT, false, vertexSize, vertices ); // Set Vertex Pointer
 
-      if ( hasColor )  {                              // IF Vertices Have Color
-         gl.glEnableClientState( GL10.GL_COLOR_ARRAY );  // Enable Color in Vertices
+      if ( hasColor && program.a_Color != -1 )  {                              // IF Vertices Have Color
+         GLES20.glEnableVertexAttribArray( program.a_Color );  // Enable Color in Vertices
          vertices.position( positionCnt );            // Set Vertex Buffer to Color
-         gl.glColorPointer( COLOR_CNT, GL10.GL_FLOAT, vertexSize, vertices );  // Set Color Pointer
+         GLES20.glVertexAttribPointer( program.a_Color, COLOR_CNT, GLES20.GL_FLOAT, false, vertexSize, vertices ); // Set Color Pointer
       }
 
-      if ( hasTexCoords )  {                          // IF Vertices Have Texture Coords
-         gl.glEnableClientState( GL10.GL_TEXTURE_COORD_ARRAY );  // Enable Texture Coords in Vertices
+      if ( hasTexCoords && program.a_TexCoord != -1 )  {                          // IF Vertices Have Texture Coords
+         GLES20.glEnableVertexAttribArray( program.a_TexCoord );  // Enable Texture Coords in Vertices
          vertices.position( positionCnt + ( hasColor ? COLOR_CNT : 0 ) );  // Set Vertex Buffer to Texture Coords (NOTE: position based on whether color is also specified)
-         gl.glTexCoordPointer( TEXCOORD_CNT, GL10.GL_FLOAT, vertexSize, vertices );  // Set Texture Coords Pointer
+         GLES20.glVertexAttribPointer( program.a_TexCoord, TEXCOORD_CNT, GLES20.GL_FLOAT, false, vertexSize, vertices );  // Set Texture Coords Pointer
       }
 
-      if ( hasNormals )  {
-         gl.glEnableClientState( GL10.GL_NORMAL_ARRAY );  // Enable Normals in Vertices
+      if ( hasNormals && program.a_Normal != -1 )  {
+         GLES20.glEnableVertexAttribArray( program.a_Normal );  // Enable Normals in Vertices
          vertices.position( positionCnt + ( hasColor ? COLOR_CNT : 0 ) + ( hasTexCoords ? TEXCOORD_CNT : 0 ) );  // Set Vertex Buffer to Normals (NOTE: position based on whether color/texcoords is also specified)
-         gl.glNormalPointer( GL10.GL_FLOAT, vertexSize, vertices );  // Set Normals Pointer
+         GLES20.glVertexAttribPointer( program.a_Normal, NORMAL_CNT, GLES20.GL_FLOAT, false, vertexSize, vertices ); // Set Normals Pointer
       }
    }
 
@@ -144,10 +144,10 @@ public class Vertices {
    public void draw(int primitiveType, int offset, int numVertices)  {
       if ( indices != null )  {                       // IF Indices Exist
          indices.position( offset );                  // Set Index Buffer to Specified Offset
-         gl.glDrawElements( primitiveType, numVertices, GL10.GL_UNSIGNED_SHORT, indices );  // Draw Indexed
+         GLES20.glDrawElements( primitiveType, numVertices, GLES20.GL_UNSIGNED_SHORT, indices );  // Draw Indexed
       }
       else  {                                         // ELSE No Indices Exist
-         gl.glDrawArrays( primitiveType, offset, numVertices );  // Draw Direct (Array)
+         GLES20.glDrawArrays( primitiveType, offset, numVertices );  // Draw Direct (Array)
       }
    }
 
@@ -157,14 +157,14 @@ public class Vertices {
    // A: [none]
    // R: [none]
    public void unbind()  {
-      if ( hasColor )                                 // IF Vertices Have Color
-         gl.glDisableClientState( GL10.GL_COLOR_ARRAY );  // Clear Color State
+      if ( hasColor && program.a_Color != -1 )                                 // IF Vertices Have Color
+         GLES20.glDisableVertexAttribArray( program.a_Color );  // Clear Color State
 
-      if ( hasTexCoords )                             // IF Vertices Have Texture Coords
-         gl.glDisableClientState( GL10.GL_TEXTURE_COORD_ARRAY );  // Clear Texture Coords State
+      if ( hasTexCoords && program.a_TexCoord != -1 )                             // IF Vertices Have Texture Coords
+         GLES20.glDisableVertexAttribArray( program.a_TexCoord );  // Clear Texture Coords State
 
-      if ( hasNormals )                               // IF Vertices Have Normals
-         gl.glDisableClientState( GL10.GL_NORMAL_ARRAY );  // Clear Normals State
+      if ( hasNormals && program.a_Normal != -1 )                               // IF Vertices Have Normals
+         GLES20.glDisableVertexAttribArray( program.a_Normal );  // Clear Normals State
    }
 
    //--Draw Full--//
@@ -175,35 +175,35 @@ public class Vertices {
    //    numVertices - the number of vertices (indices) to draw
    // R: [none]
    public void drawFull(int primitiveType, int offset, int numVertices)  {
-      gl.glEnableClientState( GL10.GL_VERTEX_ARRAY ); // Enable Position in Vertices
+      GLES20.glEnableVertexAttribArray( program.a_Position ); // Enable Position in Vertices
       vertices.position( 0 );                         // Set Vertex Buffer to Position
-      gl.glVertexPointer( positionCnt, GL10.GL_FLOAT, vertexSize, vertices );  // Set Vertex Pointer
+      GLES20.glVertexAttribPointer( program.a_Position, positionCnt, GLES20.GL_FLOAT, false, vertexSize, vertices ); // Set Vertex Pointer
 
-      if ( hasColor )  {                              // IF Vertices Have Color
-         gl.glEnableClientState( GL10.GL_COLOR_ARRAY );  // Enable Color in Vertices
+      if ( hasColor && program.a_Color != -1 )  {                              // IF Vertices Have Color
+         GLES20.glEnableVertexAttribArray( program.a_Color );  // Enable Color in Vertices
          vertices.position( positionCnt );            // Set Vertex Buffer to Color
-         gl.glColorPointer( COLOR_CNT, GL10.GL_FLOAT, vertexSize, vertices );  // Set Color Pointer
+         GLES20.glVertexAttribPointer( program.a_Color, COLOR_CNT, GLES20.GL_FLOAT, false, vertexSize, vertices ); // Set Color Pointer
       }
 
-      if ( hasTexCoords )  {                          // IF Vertices Have Texture Coords
-         gl.glEnableClientState( GL10.GL_TEXTURE_COORD_ARRAY );  // Enable Texture Coords in Vertices
+      if ( hasTexCoords && program.a_TexCoord != -1 )  {                          // IF Vertices Have Texture Coords
+         GLES20.glEnableVertexAttribArray( program.a_TexCoord );  // Enable Texture Coords in Vertices
          vertices.position( positionCnt + ( hasColor ? COLOR_CNT : 0 ) );  // Set Vertex Buffer to Texture Coords (NOTE: position based on whether color is also specified)
-         gl.glTexCoordPointer( TEXCOORD_CNT, GL10.GL_FLOAT, vertexSize, vertices );  // Set Texture Coords Pointer
+         GLES20.glVertexAttribPointer( program.a_TexCoord, TEXCOORD_CNT, GLES20.GL_FLOAT, false, vertexSize, vertices );  // Set Texture Coords Pointer
       }
 
       if ( indices != null )  {                       // IF Indices Exist
          indices.position( offset );                  // Set Index Buffer to Specified Offset
-         gl.glDrawElements( primitiveType, numVertices, GL10.GL_UNSIGNED_SHORT, indices );  // Draw Indexed
+         GLES20.glDrawElements( primitiveType, numVertices, GLES20.GL_UNSIGNED_SHORT, indices );  // Draw Indexed
       }
       else  {                                         // ELSE No Indices Exist
-         gl.glDrawArrays( primitiveType, offset, numVertices );  // Draw Direct (Array)
+         GLES20.glDrawArrays( primitiveType, offset, numVertices );  // Draw Direct (Array)
       }
 
-      if ( hasTexCoords )                             // IF Vertices Have Texture Coords
-         gl.glDisableClientState( GL10.GL_TEXTURE_COORD_ARRAY );  // Clear Texture Coords State
+      if ( hasTexCoords && program.a_TexCoord != -1 )              // IF Vertices Have Texture Coords
+         GLES20.glDisableVertexAttribArray( program.a_TexCoord );  // Clear Texture Coords State
 
-      if ( hasColor )                                 // IF Vertices Have Color
-         gl.glDisableClientState( GL10.GL_COLOR_ARRAY );  // Clear Color State
+      if ( hasColor && program.a_Color != -1 )                     // IF Vertices Have Color
+         GLES20.glDisableVertexAttribArray( program.a_Color );  // Clear Color State
    }
 
    //--Set Vertex Elements--//

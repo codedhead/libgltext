@@ -1,3 +1,7 @@
+// This is a OpenGL ES 2.0 port of the text rendering library that's originally developed by
+// fractious: http://fractiousg.blogspot.com/2012/04/rendering-text-in-opengl-on-android.html
+// Below is the original description of the file:
+// ------------------------------------------------------------------------------------------------
 // This is a OpenGL ES 1.0 dynamic font rendering system. It loads actual font
 // files, generates a font map (texture) from them, and allows rendering of
 // text strings.
@@ -9,14 +13,14 @@
 
 package ninja.jun.gl.libgltext;
 
-import javax.microedition.khronos.opengles.GL10;
-
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.opengl.GLES20;
 import android.opengl.GLUtils;
+import android.opengl.Matrix;
 
 public class GLText {
 
@@ -34,9 +38,9 @@ public class GLText {
    public final static int CHAR_BATCH_SIZE = 100;     // Number of Characters to Render Per Batch
 
    //--Members--//
-   GL10 gl;                                           // GL10 Instance
    AssetManager assets;                               // Asset Manager
    SpriteBatch batch;                                 // Batch Renderer
+   GLTextProgram glTextProgram;                       // Shader program
 
    int fontPadX, fontPadY;                            // Font Padding (Pixels; On Each Side, ie. Doubled on Both X+Y Axis)
 
@@ -58,15 +62,17 @@ public class GLText {
    float scaleX, scaleY;                              // Font Scale (X,Y Axis)
    float spaceX;                                      // Additional (X,Y Axis) Spacing (Unscaled)
 
+   private float[] tempBuffer16 = new float[16];
+   private float[] projectionMatrix = new float[16];
+
 
    //--Constructor--//
-   // D: save GL instance + asset manager, create arrays, and initialize the members
-   // A: gl - OpenGL ES 10 Instance
-   public GLText(GL10 gl, AssetManager assets) {
-      this.gl = gl;                                   // Save the GL10 Instance
+   // D: save asset manager, create shader program, create arrays, and initialize the members
+   public GLText(AssetManager assets) {
       this.assets = assets;                           // Save the Asset Manager Instance
 
-      batch = new SpriteBatch( gl, CHAR_BATCH_SIZE );  // Create Sprite Batch (with Defined Size)
+      this.glTextProgram = new GLTextProgram();
+      batch = new SpriteBatch( glTextProgram, CHAR_BATCH_SIZE );  // Create Sprite Batch (with Defined Size)
 
       charWidths = new float[CHAR_CNT];               // Create the Array of Character Widths
       charRgn = new TextureRegion[CHAR_CNT];          // Create the Array of Character Regions
@@ -104,6 +110,8 @@ public class GLText {
    //    size - Requested pixel size of font (height)
    //    padX, padY - Extra padding per character (X+Y Axis); to prevent overlapping characters.
    public boolean load(String file, int size, int padX, int padY) {
+      glTextProgram.init();
+      Matrix.setIdentityM(projectionMatrix, 0);
 
       // setup requested values
       fontPadX = padX;                                // Set Requested X Axis Padding
@@ -193,19 +201,19 @@ public class GLText {
 
       // generate a new texture
       int[] textureIds = new int[1];                  // Array to Get Texture Id
-      gl.glGenTextures( 1, textureIds, 0 );           // Generate New Texture
+      GLES20.glGenTextures( 1, textureIds, 0 );       // Generate New Texture
       textureId = textureIds[0];                      // Save Texture Id
 
       // setup filters for texture
-      gl.glBindTexture( GL10.GL_TEXTURE_2D, textureId );  // Bind Texture
-      gl.glTexParameterf( GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MIN_FILTER, GL10.GL_NEAREST );  // Set Minification Filter
-      gl.glTexParameterf( GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_MAG_FILTER, GL10.GL_LINEAR );  // Set Magnification Filter
-      gl.glTexParameterf( GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_S, GL10.GL_CLAMP_TO_EDGE );  // Set U Wrapping
-      gl.glTexParameterf( GL10.GL_TEXTURE_2D, GL10.GL_TEXTURE_WRAP_T, GL10.GL_CLAMP_TO_EDGE );  // Set V Wrapping
+      GLES20.glBindTexture( GLES20.GL_TEXTURE_2D, textureId );  // Bind Texture
+      GLES20.glTexParameterf( GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST );    // Set Minification Filter
+      GLES20.glTexParameterf( GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR );    // Set Magnification Filter
+      GLES20.glTexParameterf( GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE );  // Set U Wrapping
+      GLES20.glTexParameterf( GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE );  // Set V Wrapping
 
       // load the generated bitmap onto the texture
-      GLUtils.texImage2D( GL10.GL_TEXTURE_2D, 0, bitmap, 0 );  // Load Bitmap to Texture
-      gl.glBindTexture( GL10.GL_TEXTURE_2D, 0 );      // Unbind Texture
+      GLUtils.texImage2D( GLES20.GL_TEXTURE_2D, 0, bitmap, 0 );  // Load Bitmap to Texture
+      GLES20.glBindTexture( GLES20.GL_TEXTURE_2D, 0 );      // Unbind Texture
 
       // release the bitmap
       bitmap.recycle();                               // Release the Bitmap
@@ -242,13 +250,48 @@ public class GLText {
       begin( 1.0f, 1.0f, 1.0f, alpha );               // Begin with White (Explicit Alpha)
    }
    public void begin(float red, float green, float blue, float alpha)  {
-      gl.glColor4f( red, green, blue, alpha );        // Set Color+Alpha
-      gl.glBindTexture( GL10.GL_TEXTURE_2D, textureId );  // Bind the Texture
+      setColor( red, green, blue, alpha ); // Set Color+Alpha
+      GLES20.glBindTexture( GLES20.GL_TEXTURE_2D, textureId );  // Bind the Texture
       batch.beginBatch();                             // Begin Batch
    }
    public void end()  {
       batch.endBatch();                               // End Batch
-      gl.glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );         // Restore Default Color/Alpha
+      setColor( 1.0f, 1.0f, 1.0f, 1.0f ); // Restore Default Color/Alpha
+   }
+
+   //--Begin/End GLText program--//
+   // D: must be called before any other GLText calls when rendering a new frame
+   public void beginProgram() {
+      glTextProgram.use();
+      Matrix.setIdentityM(tempBuffer16, 0);
+      setModelViewMatrix(tempBuffer16);
+      GLES20.glEnable( GLES20.GL_BLEND );                   // Enable Alpha Blend
+      GLES20.glBlendFunc( GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA );  // Set Alpha Blend Function
+   }
+   public void endProgram() {
+      GLES20.glDisable( GLES20.GL_BLEND );                  // Disable Alpha Blend
+   }
+   public void useProgram() {
+      glTextProgram.use();
+   }
+
+   public void setColor(float red, float green, float blue, float alpha) {
+      tempBuffer16[0] = red;
+      tempBuffer16[1] = green;
+      tempBuffer16[2] = blue;
+      tempBuffer16[3] = alpha;
+      GLES20.glUniform4fv(glTextProgram.u_Color, 1, tempBuffer16, 0); // Set Color+Alpha
+   }
+
+   public void setModelViewMatrix(float[] mv) {
+      Matrix.multiplyMM(tempBuffer16, 0, projectionMatrix, 0, mv, 0);
+      setMVP(tempBuffer16);
+   }
+   public void setProjectionMatrix(float[] p) {
+      System.arraycopy(p, 0, projectionMatrix, 0, 16);
+   }
+   public void setMVP(float[] mvp) {
+      GLES20.glUniformMatrix4fv(glTextProgram.u_MVP, 1, false, mvp, 0);
    }
 
    //--Draw Text--//

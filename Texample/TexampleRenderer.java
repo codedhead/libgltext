@@ -6,10 +6,11 @@ package com.android.texample;
 import ninja.jun.gl.libgltext.GLText;
 
 import javax.microedition.khronos.egl.EGLConfig;
-import javax.microedition.khronos.opengles.GL10;
 
 import android.content.Context;
+import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.opengl.Matrix;
 
 public class TexampleRenderer implements GLSurfaceView.Renderer  {
 
@@ -24,35 +25,26 @@ public class TexampleRenderer implements GLSurfaceView.Renderer  {
       this.context = context;                         // Save Specified Context
    }
 
-   public void onSurfaceCreated(GL10 gl, EGLConfig config) {
+   public void onSurfaceCreated(EGLConfig config) {
       // Set the background frame color
-      gl.glClearColor( 0.5f, 0.5f, 0.5f, 1.0f );
+      GLES20.glClearColor( 0.5f, 0.5f, 0.5f, 1.0f );
 
       // Create the GLText
-      glText = new GLText( gl, context.getAssets() );
+      glText = new GLText( context.getAssets() );
 
       // Load the font from file (set size + padding), creates the texture
       // NOTE: after a successful call to this the font is ready for rendering!
       glText.load( "Roboto-Regular.ttf", 14, 2, 2 );  // Create Font (Height: 14 Pixels / X+Y Padding 2 Pixels)
    }
 
-   public void onDrawFrame(GL10 gl) {
+   public void onDrawFrame() {
       // Redraw background color
-      gl.glClear( GL10.GL_COLOR_BUFFER_BIT );
+      GLES20.glClear( GLES20.GL_COLOR_BUFFER_BIT );
 
-      // Set to ModelView mode
-      gl.glMatrixMode( GL10.GL_MODELVIEW );           // Activate Model View Matrix
-      gl.glLoadIdentity();                            // Load Identity Matrix
-
-      // enable texture + alpha blending
-      // NOTE: this is required for text rendering! we could incorporate it into
-      // the GLText class, but then it would be called multiple times (which impacts performance).
-      gl.glEnable( GL10.GL_TEXTURE_2D );              // Enable Texture Mapping
-      gl.glEnable( GL10.GL_BLEND );                   // Enable Alpha Blend
-      gl.glBlendFunc( GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA );  // Set Alpha Blend Function
+      glText.beginProgram();
 
       // TEST: render the entire font texture
-      gl.glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );         // Set Color to Use
+      glText.setColor( 1.0f, 1.0f, 1.0f, 1.0f );         // Set Color to Use
       glText.drawTexture( width, height );            // Draw the Entire Texture
 
       // TEST: render some strings with the font
@@ -67,22 +59,21 @@ public class TexampleRenderer implements GLSurfaceView.Renderer  {
       glText.draw( "The End.", 50, 150 + glText.getCharHeight() );  // Draw Test String
       glText.end();                                   // End Text Rendering
 
-      // disable texture + alpha
-      gl.glDisable( GL10.GL_BLEND );                  // Disable Alpha Blend
-      gl.glDisable( GL10.GL_TEXTURE_2D );             // Disable Texture Mapping
+      glText.endProgram();
    }
 
-   public void onSurfaceChanged(GL10 gl, int width, int height) {
-      gl.glViewport( 0, 0, width, height );
+   public void onSurfaceChanged(int width, int height) {
+      GLES20.glViewport( 0, 0, width, height );
 
       // Setup orthographic projection
-      gl.glMatrixMode( GL10.GL_PROJECTION );          // Activate Projection Matrix
-      gl.glLoadIdentity();                            // Load Identity Matrix
-      gl.glOrthof(                                    // Set Ortho Projection (Left,Right,Bottom,Top,Front,Back)
+      float[] projection = new float[16];
+      glText.useProgram();
+      Matrix.orthoM(projection, 0,
          0, width,
          0, height,
          1.0f, -1.0f
       );
+      glText.setProjectionMatrix(projection);
 
       // Save width and height
       this.width = width;                             // Save Current Width

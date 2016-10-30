@@ -1,8 +1,7 @@
 package ninja.jun.gl.libgltext;
 
+import android.opengl.GLES20;
 import android.util.FloatMath;
-
-import javax.microedition.khronos.opengles.GL10;
 
 public class SpriteBatch {
 
@@ -12,7 +11,6 @@ public class SpriteBatch {
    final static int INDICES_PER_SPRITE = 6;           // Indices Per Sprite
 
    //--Members--//
-   GL10 gl;                                           // GL Instance
    Vertices vertices;                                 // Vertices Instance Used for Rendering
    float[] vertexBuffer;                              // Vertex Buffer
    int bufferIndex;                                   // Vertex Buffer Start Index
@@ -21,12 +19,11 @@ public class SpriteBatch {
 
    //--Constructor--//
    // D: prepare the sprite batcher for specified maximum number of sprites
-   // A: gl - the gl instance to use for rendering
+   // A: program - the shader program used for text rendering
    //    maxSprites - the maximum allowed sprites per batch
-   public SpriteBatch(GL10 gl, int maxSprites)  {
-      this.gl = gl;                                   // Save GL Instance
+   public SpriteBatch(GLTextProgram program, int maxSprites)  {
       this.vertexBuffer = new float[maxSprites * VERTICES_PER_SPRITE * VERTEX_SIZE];  // Create Vertex Buffer
-      this.vertices = new Vertices( gl, maxSprites * VERTICES_PER_SPRITE, maxSprites * INDICES_PER_SPRITE, false, true, false );  // Create Rendering Vertices
+      this.vertices = new Vertices( program, maxSprites * VERTICES_PER_SPRITE, maxSprites * INDICES_PER_SPRITE );  // Create Rendering Vertices
       this.bufferIndex = 0;                           // Reset Buffer Index
       this.maxSprites = maxSprites;                   // Save Maximum Sprites
       this.numSprites = 0;                            // Clear Sprite Counter
@@ -51,7 +48,7 @@ public class SpriteBatch {
    // A: textureId - the ID of the texture to use for the batch
    // R: [none]
    public void beginBatch(int textureId)  {
-      gl.glBindTexture( GL10.GL_TEXTURE_2D, textureId );  // Bind the Texture
+      GLES20.glBindTexture( GLES20.GL_TEXTURE_2D, textureId );  // Bind the Texture
       numSprites = 0;                                 // Empty Sprite Counter
       bufferIndex = 0;                                // Reset Buffer Index (Empty)
    }
@@ -68,7 +65,7 @@ public class SpriteBatch {
       if ( numSprites > 0 )  {                        // IF Any Sprites to Render
          vertices.setVertices( vertexBuffer, 0, bufferIndex );  // Set Vertices from Buffer
          vertices.bind();                             // Bind Vertices
-         vertices.draw( GL10.GL_TRIANGLES, 0, numSprites * INDICES_PER_SPRITE );  // Render Batched Sprites
+         vertices.draw( GLES20.GL_TRIANGLES, 0, numSprites * INDICES_PER_SPRITE );  // Render Batched Sprites
          vertices.unbind();                           // Unbind Vertices
       }
    }
