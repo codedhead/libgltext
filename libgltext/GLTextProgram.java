@@ -6,7 +6,6 @@ import android.util.Log;
 /**
  * Shader program to drive GLText.
  */
-
 public class GLTextProgram {
   private static final String TAG = "libgltext";
 
